@@ -26,8 +26,6 @@ def get_text(x, y, w, h):
         screenshot,
         lang='eng'
     )
-
-    # print(text)
     is_done = False
     for key in tools.keys():
         value = tools[key]
@@ -61,21 +59,3 @@ def cb(hwnd, extra):
 
 while True:
     win32gui.EnumWindows(cb, None)
-# time.sleep(1)
-
-#
-#
-# screenshot = ImageGrab.grab(include_layered_windows=True)
-#
-# screenshot.show()
-
-# filename = 'C:\\Users\\bsangs\\AppData\\Roaming\\.minecraft\\screenshots\\stone.png'
-# image = Image.open(filename)
-
-# start = datetime.now()
-# text = pytesseract.image_to_string(
-#     image,
-#     lang='eng'
-# )
-#
-# print(text, datetime.now() - start, 'ms')
