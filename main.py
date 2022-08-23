@@ -1,7 +1,12 @@
 import time
+import os
+
+import threading
 
 from PIL import ImageGrab, ImageOps
 import pytesseract
+import pyautogui
+import keyboard as kb
 import win32gui
 import win32com.client as comctl
 from datetime import datetime
@@ -14,6 +19,8 @@ tools = {
 }
 start_title = '1.19'
 pytesseract.pytesseract.tesseract_cmd = r'tesseract'
+
+isProcessing = True
 
 
 def get_text(x, y, w, h):
@@ -63,6 +70,34 @@ def cb(hwnd, extra):
         get_text(x, y, w, h)
 
 
-time.sleep(3)
-while True:
-    win32gui.EnumWindows(cb, None)
+def change_tools():
+    while isProcessing:
+        win32gui.EnumWindows(cb, None)
+
+
+def hold_key():
+    while isProcessing:
+        pyautogui.keyDown('shift')
+
+
+def detect_exit_key():
+    while True:
+        if kb.is_pressed("ctrl"):
+            isProcessing = False
+            print('Exit...')
+            os._exit(1)
+            break
+
+
+detect_exit_key_thread = threading.Thread(target=detect_exit_key)
+detect_exit_key_thread.start()
+
+for i in range(5):
+    print("[macro] Starting %d sec left." % (5 - i))
+    time.sleep(1)
+
+hold_key_thread = threading.Thread(target=hold_key)
+hold_key_thread.start()
+
+change_tools_thread = threading.Thread(target=change_tools)
+change_tools_thread.start()
