@@ -1,6 +1,6 @@
 import time
 
-from PIL import ImageGrab
+from PIL import ImageGrab, ImageOps
 import pytesseract
 import win32gui
 import win32com.client as comctl
@@ -8,31 +8,37 @@ from datetime import datetime
 
 keyboard = comctl.Dispatch("WScript.Shell")
 tools = {
-    1: ['shovel', 'shouel', 'snovel', 'snouel', 'shavel'],
-    2: ['pickaxe', 'piokaxe', 'pickaxo', 'piokaxo'],
+    1: ['shovel', 'shouel', 'snovel', 'snouel', 'shavel', 'showvel', 'showel', 'shivel'],
+    2: ['pickaxe', 'piokaxe', 'pickaxo', 'piokaxo', 'piskaxe'],
     3: ['axe', 'axo', 'sxe']
 }
-start_title = '.png'
+start_title = '1.19'
 pytesseract.pytesseract.tesseract_cmd = r'tesseract'
 
 
 def get_text(x, y, w, h):
-    screenshot = ImageGrab.grab(bbox=(x + w / 4 * 3, y + h / 2, x + w, y + h - h/8))
+    screenshot = ImageGrab.grab(bbox=(x + 120, y + 80, x + (w / 5 * 3) / 3 * 2, y + h / 3 * 2))
+
+    screenshot = ImageOps.grayscale(screenshot)
+    screenshot = ImageOps.invert(screenshot)
+    screenshot = screenshot.copy()
+
     # screenshot.show()
 
     start = datetime.now()
 
-    text: str = pytesseract.image_to_string(
+    text = pytesseract.image_to_string(
         screenshot,
         lang='eng'
     )
+    # print("text", text)
     is_done = False
     for key in tools.keys():
         value = tools[key]
         if is_done:
             break
         for name in value:
-            if name in text:
+            if name in str(text).lower():
                 is_done = True
                 print(f'[macro] {name} (recognition: {value[0]}) '
                       f'running time: {(datetime.now() - start).total_seconds()}s')
@@ -57,5 +63,6 @@ def cb(hwnd, extra):
         get_text(x, y, w, h)
 
 
+time.sleep(3)
 while True:
     win32gui.EnumWindows(cb, None)
