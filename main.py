@@ -1,10 +1,13 @@
 import time
 import os
 
-import threading
+from multiprocessing import Process
+
+import re
 
 from PIL import ImageGrab, ImageOps
-import pytesseract
+from easyocr import Reader
+import numpy as np
 import pyautogui
 import keyboard as kb
 import win32gui
@@ -12,34 +15,56 @@ import win32com.client as comctl
 from datetime import datetime
 
 keyboard = comctl.Dispatch("WScript.Shell")
+reader = Reader(lang_list=['en'], gpu=True)
+
 tools = {
     1: ['shovel', 'shouel', 'snovel', 'snouel', 'shavel', 'showvel', 'showel', 'shivel'],
     2: ['pickaxe', 'piokaxe', 'pickaxo', 'piokaxo', 'piskaxe'],
     3: ['axe', 'axo', 'sxe']
 }
 start_title = '1.19'
-pytesseract.pytesseract.tesseract_cmd = r'tesseract'
 
 isProcessing = True
 
+press_key = 4
+
+
+def easyocr_read(obj):
+    results = reader.readtext(
+        image=obj,
+        decoder='greedy',
+        batch_size=10,
+        low_text=0.3,
+        text_threshold=0.5,
+    )
+    results = sorted(results, key=lambda x: x[0][0])
+    text_results = [x[-2] for x in results]
+    easy_output = " ".join(text_results)
+    easy_output = easy_output.strip()
+    easy_output = re.sub('\s{2,}', ' ', easy_output)
+
+    return easy_output
+
 
 def get_text(x, y, w, h):
-    screenshot = ImageGrab.grab(bbox=(x + 120, y + 80, x + (w / 5 * 3) / 3 * 2, y + h / 3 * 2))
+    original_screenshot = ImageGrab.grab(bbox=(x + 120, y + 80, x + (w / 5 * 3) / 3 * 2, y + h / 3 * 2))
+    # original_screenshot = ImageGrab.grab(bbox=(x + 100, y + 80, x + w - 100, y + h))
+
+    screenshot = original_screenshot.copy()
 
     screenshot = ImageOps.grayscale(screenshot)
     screenshot = ImageOps.invert(screenshot)
     screenshot = screenshot.copy()
 
+    screenshot_np = np.array(screenshot)
+
     # screenshot.show()
 
     start = datetime.now()
 
-    text = pytesseract.image_to_string(
-        screenshot,
-        lang='eng'
-    )
-    # print("text", text)
+    text = easyocr_read(screenshot_np)
     is_done = False
+
     for key in tools.keys():
         value = tools[key]
         if is_done:
@@ -47,9 +72,15 @@ def get_text(x, y, w, h):
         for name in value:
             if name in str(text).lower():
                 is_done = True
+                running_time = (datetime.now() - start).total_seconds()
                 print(f'[macro] {name} (recognition: {value[0]}) '
-                      f'running time: {(datetime.now() - start).total_seconds()}s')
-                keyboard.SendKeys(key, 0)
+                      f'running time: {running_time}s')
+                if press_key != key:
+                    keyboard.SendKeys(key, 0)
+                    press_key = key
+
+                if running_time > 1:
+                    original_screenshot.save(f'.\\logs\\{datetime.now().timestamp()}.png', 'png')
                 break
 
 
@@ -67,12 +98,12 @@ def cb(hwnd, extra):
         return
 
     if start_title in win_title:
-        get_text(x, y, w, h)
+        while isProcessing:
+            get_text(x, y, w, h)
 
 
 def change_tools():
-    while isProcessing:
-        win32gui.EnumWindows(cb, None)
+    win32gui.EnumWindows(cb, None)
 
 
 def hold_key():
@@ -80,24 +111,26 @@ def hold_key():
         pyautogui.keyDown('shift')
 
 
-def detect_exit_key():
+def detect_exit_key(processes):
     while True:
         if kb.is_pressed("ctrl"):
             isProcessing = False
             print('Exit...')
+            for p in processes:
+                p.terminate()
             os._exit(1)
             break
 
 
-detect_exit_key_thread = threading.Thread(target=detect_exit_key)
-detect_exit_key_thread.start()
+def main():
+    p1 = Process(target=change_tools)
+    p1.start()
 
-for i in range(5):
-    print("[macro] Starting %d sec left." % (5 - i))
-    time.sleep(1)
+    p2 = Process(target=hold_key)
+    p2.start()
 
-hold_key_thread = threading.Thread(target=hold_key)
-hold_key_thread.start()
+    detect_exit_key([p1, p2])
 
-change_tools_thread = threading.Thread(target=change_tools)
-change_tools_thread.start()
+
+if __name__ == '__main__':
+    main()
